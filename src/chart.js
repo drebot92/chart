@@ -1,11 +1,150 @@
 console.time();
 
 const minMax = (min, max, value) => Math.min(max, Math.max(min, value));
-
 const forEachKey = (obj, fn) => Object.keys(obj).forEach(key => fn(key, obj[key]));
-
 const setAttributes = (node, attrs) => forEachKey(attrs, (key, value) => node.setAttribute(key, value));
 const setAttributesNS = (node, attrs) => forEachKey(attrs, (key, value) => node.setAttributeNS(null, key, value));
+const appendChilds = (node, childs) => childs.forEach(child => node.appendChild(child));
+
+const RangeSelector = function RangeSelector(style) {
+  const range = {
+    width: 0,
+    left: 0,
+    leftPercent: 0,
+    right: 0,
+    value: 0,
+    valuePercent: 1,
+  };
+  const cursor = {
+    offsetX: 0,
+    startX: 0,
+  };
+  const minAreaWidth = 80;
+
+  let leftOld = 0;
+  let rightOld = 0;
+  let leftMax = 0;
+  let rightMax = 0;
+  let change = () => {};
+
+  const node = document.createElement('div');
+  const rangeArea = document.createElement('div');
+  const areaHandle = document.createElement('div');
+  const leftHandle = document.createElement('div');
+  const rightHandle = document.createElement('div');
+  const overflowLeft = document.createElement('div');
+  const overflowRight = document.createElement('div');
+
+  node.setAttribute('class', 'range-controls');
+  node.style.display = 'grid';
+  node.style.gridTemplateColumns = `${0}px 1fr ${0}px`;
+
+  forEachKey(style, (key, value) => {
+    node.style[key] = value;
+  });
+
+  rangeArea.setAttribute('class', 'range-controls__area');
+  areaHandle.setAttribute('class', 'range-controls__area-handle');
+  leftHandle.setAttribute('class', 'range-controls__handle');
+  rightHandle.setAttribute('class', 'range-controls__handle');
+  overflowLeft.setAttribute('class', 'range-controls__overflow');
+  overflowRight.setAttribute('class', 'range-controls__overflow');
+
+  appendChilds(rangeArea, [
+    leftHandle,
+    areaHandle,
+    rightHandle,
+  ]);
+  appendChilds(node, [
+    overflowLeft,
+    rangeArea,
+    overflowRight,
+  ]);
+
+  let handle = null;
+
+  const mouseMove = event => {
+    if (handle === null) return;
+    if (event.touches) {
+      cursor.offsetX = event.touches[0].clientX - cursor.startX;
+    } else {
+      cursor.offsetX = event.clientX - cursor.startX;
+    }
+
+    range.width = range.width || node.offsetWidth;
+    leftMax = range.width - minAreaWidth - range.right;
+    rightMax = range.width - minAreaWidth - range.left;
+
+    if (handle === 'left') {
+      range.left = minMax(0, leftMax, leftOld + cursor.offsetX);
+      range.leftPercent = range.left / range.width;
+    }
+
+    if (handle === 'right') {
+      range.right = minMax(0, rightMax, rightOld - cursor.offsetX);
+    }
+
+    range.value = range.width - range.right - range.left;
+    range.valuePercent = range.value / range.width;
+
+    if (handle === 'area') {
+      range.left = minMax(0, range.width - range.value, leftOld + cursor.offsetX);
+      range.leftPercent = range.left / range.width;
+      range.right = minMax(0, range.width - range.value, rightOld - cursor.offsetX);
+    }
+
+    node.style.gridTemplateColumns = `${range.left}px 1fr ${range.right}px`;
+    change(range);
+  };
+  const mouseUp = () => {
+    if (handle !== null) {
+      leftOld = range.left;
+      rightOld = range.right;
+    }
+    handle = null;
+    cursor.startX = 0;
+  };
+
+  const setHandleStart = handleName => event => {
+    handle = handleName;
+    if (event.touches) {
+      cursor.startX = event.touches[0].clientX;
+      return;
+    }
+    cursor.startX = event.clientX;
+  };
+  const mouseDownArea = setHandleStart('area');
+  const mouseDownLeft = setHandleStart('left');
+  const mouseDownRight = setHandleStart('right');
+
+  const listeners = {
+    add: (target, eventList, fn) => eventList.split(' ').forEach(event => target.addEventListener(event, fn)),
+    remove: (target, eventList, fn) => eventList.split(' ').forEach(event => target.removeEventListener(event, fn)),
+  };
+
+  listeners.add(leftHandle, 'mousedown touchstart pointerdown', mouseDownLeft);
+  listeners.add(areaHandle, 'mousedown touchstart pointerdown', mouseDownArea);
+  listeners.add(rightHandle, 'mousedown touchstart pointerdown', mouseDownRight);
+  listeners.add(node, 'touchmove', mouseMove);
+  listeners.add(node, 'touchend', mouseUp);
+  const addEventListeners = () => {
+    listeners.add(window, 'mousemove pointermove', mouseMove);
+    listeners.add(window, 'mouseup pointerup', mouseUp);
+  };
+  const removeEventListeners = () => {
+    listeners.remove(window, 'mousemove pointermove', mouseMove);
+    listeners.remove(window, 'mouseup pointerup', mouseUp);
+    listeners.remove(window, 'mouseup pointerup', removeEventListeners);
+  };
+  listeners.add(node, 'mouseenter pointerenter', addEventListeners);
+  listeners.add(window, 'mouseleave pointerleave', removeEventListeners);
+
+  this.node = node;
+  this.range = range;
+  this.onChange = cb => {
+    change = cb;
+  };
+};
 
 const newChart = chartData => {
   const xmlns = 'http://www.w3.org/2000/svg';
@@ -20,7 +159,7 @@ const newChart = chartData => {
   const previewUseChart = document.createElementNS(xmlns, 'use');
   const usePreview = document.createElementNS(xmlns, 'use');
 
-  const timeInc = 1000 * 3600 * 4;
+  const timeInc = 1000 * 3600 * 24;
   const formatX = x => x / timeInc;
   const unformatX = x => x * timeInc;
   const chartHeight = 100;
@@ -73,7 +212,12 @@ const newChart = chartData => {
 
   const x = { ...getViewedX(0, xPoints.length - 1) };
   const y = { ...getViewedY(0, xPoints.length - 1) };
-  let viewedY = { ...getViewedY(0, xPoints.length - 1) };
+  let viewedY = y;
+  let previewProps = {
+    x: 0,
+    width: x.formattedRange,
+    transform: `translate(0, 0) scale(1, 1)`,
+  };
 
   const createPolylines = () => {
     lines.forEach(([name, ...yPoints]) => {
@@ -87,8 +231,6 @@ const newChart = chartData => {
         'vector-effect': 'non-scaling-stroke',
         fill: 'none',
       });
-      // polyline.setAttribute('style', `transform: translate(${-startX}px);`);
-      // console.log(id, type, name, color, data);
       chart.appendChild(polyline);
     });
   };
@@ -102,6 +244,7 @@ const newChart = chartData => {
       y: 0,
       width: x.formattedRange,
       height: previewWrapperHeight,
+      style: 'transition: transform .3s;',
     });
     usePreview.setAttributeNS(xlinkns, 'xlink:href', '#preview');
     setAttributesNS(usePreview, {
@@ -111,8 +254,10 @@ const newChart = chartData => {
     });
 
     preview.appendChild(previewUseChart);
-    svg.appendChild(preview);
-    svg.appendChild(usePreview);
+    appendChilds(svg, [
+      preview,
+      usePreview,
+    ]);
   };
 
   const updatePreview = (leftPercent, valuePercent) => {
@@ -125,20 +270,27 @@ const newChart = chartData => {
     const topPercent = (viewedY.start - y.start) / y.range;
     const heightPercent = viewedY.range / y.range;
     const previewWidth = x.formattedRange / valuePercent;
-    const previewLeft = -(leftPercent * previewWidth);
+    const previewX = -(leftPercent * previewWidth);
     const previewHeight = previewWrapperHeight / heightPercent;
     const previewTop = -(topPercent * previewHeight);
+    const transform = `translate(0, ${previewTop}) scale(1, ${1 / heightPercent})`;
 
     setAttributesNS(previewUseChart, {
-      x: previewLeft,
-      y: previewTop,
+      ...previewProps.x !== previewX && {
+        x: previewX,
+      },
+      ...previewProps.width !== previewWidth && {
+        width: previewWidth,
+      },
+      ...previewProps.transform !== transform && {
+        transform,
+      },
+    });
+    previewProps = {
+      x: previewX,
       width: previewWidth,
-      height: previewHeight,
-    });
-    setAttributesNS(usePreview, {
-      x: 0,
-      height: previewWrapperHeight,
-    });
+      transform,
+    };
   };
 
   const initChart = () => {
@@ -183,8 +335,10 @@ const newChart = chartData => {
     });
     initPreview();
     initChart();
-    svgWrapper.appendChild(svg);
-    svgWrapper.appendChild(rangeSelector.node);
+    appendChilds(svgWrapper, [
+      svg,
+      rangeSelector.node,
+    ]);
   };
 
   initSvg();
@@ -192,138 +346,3 @@ const newChart = chartData => {
   return svgWrapper;
 };
 
-class RangeSelector {
-  constructor(style) {
-    this.style = style;
-    this.range = {
-      width: 0,
-      left: 0,
-      leftPercent: 0,
-      right: 0,
-      value: 0,
-      valuePercent: 1,
-    };
-
-    this.node = document.createElement('div');
-    this.rangeArea = document.createElement('div');
-    this.areaHandle = document.createElement('div');
-    this.leftHandle = document.createElement('div');
-    this.rightHandle = document.createElement('div');
-    this.overflowLeft = document.createElement('div');
-    this.overflowRight = document.createElement('div');
-
-    this.init(this);
-  }
-
-  init({
-    range,
-    node,
-    rangeArea,
-    areaHandle,
-    leftHandle,
-    rightHandle,
-    overflowLeft,
-    overflowRight,
-  }) {
-    let leftOld = 0;
-    let rightOld = 0;
-    let leftMax = 0;
-    let rightMax = 0;
-
-    node.setAttribute('class', 'range-controls');
-    node.style.display = 'grid';
-    node.style.gridTemplateColumns = `${0}px 1fr ${0}px`;
-
-    Object.keys(this.style).forEach(key => {
-      node.style[key] = this.style[key];
-    });
-
-    rangeArea.setAttribute('class', 'range-controls__area');
-    areaHandle.setAttribute('class', 'range-controls__area-handle');
-    leftHandle.setAttribute('class', 'range-controls__handle');
-    rightHandle.setAttribute('class', 'range-controls__handle');
-    overflowLeft.setAttribute('class', 'range-controls__overflow');
-    overflowRight.setAttribute('class', 'range-controls__overflow');
-
-    rangeArea.appendChild(leftHandle);
-    rangeArea.appendChild(areaHandle);
-    rangeArea.appendChild(rightHandle);
-    node.appendChild(overflowLeft);
-    node.appendChild(rangeArea);
-    node.appendChild(overflowRight);
-
-    let handle = null;
-    const cursor = {
-      offsetX: 0,
-      startX: 0,
-    };
-    const minAreaWidth = 30;
-    const mouseMove = event => {
-      if (handle === null) return;
-      cursor.offsetX = event.clientX - cursor.startX;
-
-      range.width = range.width || node.offsetWidth;
-      leftMax = range.width - minAreaWidth - range.right;
-      rightMax = range.width - minAreaWidth - range.left;
-
-      if (handle === 'left') {
-        range.left = minMax(0, leftMax, leftOld + cursor.offsetX);
-        range.leftPercent = range.left / range.width;
-      }
-
-      if (handle === 'right') {
-        range.right = minMax(0, rightMax, rightOld - cursor.offsetX);
-      }
-
-      range.value = range.width - range.right - range.left;
-      range.valuePercent = range.value / range.width;
-
-      if (handle === 'area') {
-        range.left = minMax(0, range.width - range.value, leftOld + cursor.offsetX);
-        range.leftPercent = range.left / range.width;
-        range.right = minMax(0, range.width - range.value, rightOld - cursor.offsetX);
-      }
-
-      node.style.gridTemplateColumns = `${range.left}px 1fr ${range.right}px`;
-      this.change(this.range);
-    };
-    const mouseDownArea = event => {
-      cursor.startX = event.clientX;
-      handle = 'area';
-    };
-    const mouseDownLeft = event => {
-      cursor.startX = event.clientX;
-      handle = 'left';
-    };
-    const mouseDownRight = event => {
-      cursor.startX = event.clientX;
-      handle = 'right';
-    };
-    const mouseUp = () => {
-      if (handle !== null) {
-        leftOld = range.left;
-        rightOld = range.right;
-      }
-      handle = null;
-      cursor.startX = 0;
-    };
-    node.addEventListener('mouseenter', () => {
-      window.addEventListener('mousemove', mouseMove);
-      leftHandle.addEventListener('mousedown', mouseDownLeft);
-      rightHandle.addEventListener('mousedown', mouseDownRight);
-      areaHandle.addEventListener('mousedown', mouseDownArea);
-      window.addEventListener('mouseup', mouseUp);
-    });
-    node.removeEventListener('mouseleave', () => {
-      window.removeEventListener('mousemove', mouseMove);
-      leftHandle.removeEventListener('mousedown', mouseDownLeft);
-      rightHandle.removeEventListener('mousedown', mouseDownRight);
-      areaHandle.removeEventListener('mousedown', mouseDownArea);
-      window.removeEventListener('mouseup', mouseUp);
-    });
-  }
-
-  onChange(cb) {
-    this.change = cb;
-  }
-}
