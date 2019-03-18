@@ -1,0 +1,40 @@
+body {
+  font-family: sans-serif;
+}
+
+.chart {
+  box-sizing: border-box;
+}
+.chart > svg {
+  pointer-events: none;
+}
+.chart * {
+  box-sizing: border-box;
+}
+
+.range-controls__overflow {
+  background-color: #ddd;
+  opacity: .3;
+}
+.range-controls__area {
+  display: flex;
+  justify-content: space-between;
+  background-color: transparent;
+  box-shadow: inset 0 0 0 2px #aaa;
+  opacity: .5;
+}
+.range-controls__handle {
+  background-color: #aaa;
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+}
+.range-controls__area-handle {
+  background-color: transparent;
+  width: 100%;
+  height: 100%;
+  cursor: -webkit-grab;
+}
+.range-controls__area-handle:active {
+  cursor: -webkit-grabbing;
+}
