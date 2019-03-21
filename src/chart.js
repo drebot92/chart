@@ -1,10 +1,143 @@
 console.time();
 
+const roundUp = (value, precision) => {
+  const multiplier = Math.pow(10, precision || 0);
+  return Math.ceil(value * multiplier) / multiplier;
+};
+
 const minMax = (min, max, value) => Math.min(max, Math.max(min, value));
-const forEachKey = (obj, fn) => Object.keys(obj).forEach(key => fn(key, obj[key]));
+const forEachKey = (obj, fn) => Object.keys(obj).forEach((key, index) => fn(key, obj[key], index));
 const setAttributes = (node, attrs) => forEachKey(attrs, (key, value) => node.setAttribute(key, value));
 const setAttributesNS = (node, attrs) => forEachKey(attrs, (key, value) => node.setAttributeNS(null, key, value));
 const appendChilds = (node, childs) => childs.forEach(child => node.appendChild(child));
+
+const LineCarousel = function LineCarousel(value, style) {
+  const node = document.createElement('div');
+  setAttributes(node, {
+    class: 'y-lines',
+  });
+  appendChilds(node, [
+    document.createElement('div'),
+    document.createElement('div'),
+    document.createElement('div'),
+  ]);
+  forEachKey(style, (key, val) => {
+    node.style[key] = val;
+  });
+
+  const childs = node.childNodes;
+  const currentClass = 'current y-lines__group';
+  const classes = [
+    'down y-lines__group',
+    currentClass,
+    'up y-lines__group',
+  ];
+  childs.forEach((child, index) => {
+    child.setAttribute('class', classes[index]);
+    value.forEach(lineValue => {
+      const line = document.createElement('div');
+      line.innerText = lineValue;
+      child.insertBefore(line, child.firstChild);
+    });
+  });
+
+  const setNewValue = (newValue, currentIndex, direction) => (child, index) => {
+    child.setAttribute('class', classes[index]);
+    let nextIndex = 0;
+    if (direction > 0) {
+      nextIndex = index + direction <= childs.length - 1
+        ? index + direction
+        : 0;
+    } else if (direction < 0) {
+      nextIndex = index + direction >= 0
+        ? index + direction
+        : childs.length - 1;
+    }
+    if (nextIndex === currentIndex) {
+      child.setAttribute('style', 'transition: none;');
+    } else {
+      child.removeAttribute('style');
+    }
+    if (classes[index] === currentClass) {
+      const yLines = child.childNodes;
+      newValue.forEach((lineValue, i) => {
+        yLines[yLines.length - 1 - i].innerText = lineValue;
+      });
+    }
+  };
+
+  this.up = newValue => {
+    const currentIndex = classes.indexOf(currentClass);
+    classes.unshift(classes.pop());
+    childs.forEach(setNewValue(newValue, currentIndex, 1));
+  };
+  this.down = newValue => {
+    const currentIndex = classes.indexOf(currentClass);
+    classes.push(classes.shift());
+    childs.forEach(setNewValue(newValue, currentIndex, -1));
+  };
+  this.node = node;
+};
+
+const Labels = function Labels(labels, style) {
+  const node = document.createElement('div');
+  const scrollGroup = document.createElement('div');
+  const styleNode = document.createElement('style');
+
+  node.appendChild(scrollGroup);
+  scrollGroup.setAttribute('class', 'x-labels__scroll-group');
+  node.setAttribute('class', 'x-labels');
+
+  forEachKey(style, (key, val) => {
+    node.style[key] = val;
+  });
+
+  labels.forEach(label => {
+    const labelNode = document.createElement('div');
+    labelNode.innerText = label;
+    scrollGroup.appendChild(labelNode);
+  });
+
+  let nodeWidth = scrollGroup.scrollWidth;
+  const labelWidth = 100;
+  let labelsCount = Math.floor(nodeWidth / labelWidth);
+  node.appendChild(styleNode);
+
+  const updateStyle = hiddenLabelsCount => {
+    styleNode.innerHTML = `
+      .x-labels__scroll-group > div {
+        opacity: 0;
+      }
+      .x-labels__scroll-group > div:nth-child(${hiddenLabelsCount}n+1) {
+        opacity: 1;
+      }
+    `;
+  };
+  this.updateWidth = () => {
+    const scrollWidth = scrollGroup.scrollWidth;
+    if (nodeWidth !== scrollWidth) {
+      nodeWidth = scrollWidth;
+    }
+    const tempLabelsCount = Math.floor(nodeWidth / labelWidth);
+    if (labelsCount !== tempLabelsCount) {
+      labelsCount = tempLabelsCount;
+      const hiddenLabelsCount = Math.floor(labels.length / labelsCount);
+      updateStyle(hiddenLabelsCount);
+    }
+  };
+  this.setPosition = (leftPercent, valuePercent) => {
+    this.updateWidth();
+    const width = 1 / valuePercent * 100;
+    const left = leftPercent * 100;
+    setAttributes(scrollGroup, {
+      style: `
+        width: ${width}%;
+        transform: translateX(${-left}%);
+      `,
+    });
+  };
+  this.node = node;
+};
 
 const RangeSelector = function RangeSelector(style) {
   const range = {
@@ -122,22 +255,22 @@ const RangeSelector = function RangeSelector(style) {
     remove: (target, eventList, fn) => eventList.split(' ').forEach(event => target.removeEventListener(event, fn)),
   };
 
-  listeners.add(leftHandle, 'mousedown touchstart pointerdown', mouseDownLeft);
-  listeners.add(areaHandle, 'mousedown touchstart pointerdown', mouseDownArea);
-  listeners.add(rightHandle, 'mousedown touchstart pointerdown', mouseDownRight);
+  listeners.add(leftHandle, 'mousedown touchstart', mouseDownLeft);
+  listeners.add(areaHandle, 'mousedown touchstart', mouseDownArea);
+  listeners.add(rightHandle, 'mousedown touchstart', mouseDownRight);
   listeners.add(node, 'touchmove', mouseMove);
   listeners.add(node, 'touchend', mouseUp);
   const addEventListeners = () => {
-    listeners.add(window, 'mousemove pointermove', mouseMove);
-    listeners.add(window, 'mouseup pointerup', mouseUp);
+    listeners.add(window, 'mousemove', mouseMove);
+    listeners.add(window, 'mouseup', mouseUp);
   };
   const removeEventListeners = () => {
-    listeners.remove(window, 'mousemove pointermove', mouseMove);
-    listeners.remove(window, 'mouseup pointerup', mouseUp);
-    listeners.remove(window, 'mouseup pointerup', removeEventListeners);
+    listeners.remove(window, 'mousemove', mouseMove);
+    listeners.remove(window, 'mouseup', mouseUp);
+    listeners.remove(window, 'mouseup', removeEventListeners);
   };
-  listeners.add(node, 'mouseenter pointerenter', addEventListeners);
-  listeners.add(window, 'mouseleave pointerleave', removeEventListeners);
+  listeners.add(node, 'mouseenter', addEventListeners);
+  listeners.add(window, 'mouseleave', removeEventListeners);
 
   this.node = node;
   this.range = range;
@@ -146,7 +279,14 @@ const RangeSelector = function RangeSelector(style) {
   };
 };
 
-const newChart = chartData => {
+const Chart = function Chart(appendNode, {
+  data,
+  gap = 50,
+  previewHeight: previewWrapperHeight = 300,
+  previewStrokeWidth = 2,
+  chartHeight = 50,
+  chartStrokeWidth = 1,
+}) {
   const xmlns = 'http://www.w3.org/2000/svg';
   const xlinkns = 'http://www.w3.org/1999/xlink';
 
@@ -154,7 +294,6 @@ const newChart = chartData => {
   const svg = document.createElementNS(xmlns, 'svg');
   const chart = document.createElementNS(xmlns, 'symbol');
   const useChart = document.createElementNS(xmlns, 'use');
-
   const preview = document.createElementNS(xmlns, 'symbol');
   const previewUseChart = document.createElementNS(xmlns, 'use');
   const usePreview = document.createElementNS(xmlns, 'use');
@@ -162,20 +301,27 @@ const newChart = chartData => {
   const timeInc = 1000 * 3600 * 24;
   const formatX = x => x / timeInc;
   const unformatX = x => x * timeInc;
-  const chartHeight = 100;
-  const chartTop = 300;
-  const previewWrapperHeight = 300;
+  const chartTop = previewWrapperHeight + gap;
+  const svgHeight = previewWrapperHeight + gap + chartHeight;
 
-  const types = chartData.types;
-  const names = chartData.names;
-  const colors = chartData.colors;
+  const types = data.types;
+  const names = data.names;
+  const colors = data.colors;
   let lines = [];
   let xPoints = [];
+  let xLabels = [];
 
-  chartData.columns.forEach(column => {
+  data.columns.forEach(column => {
     const [name, ...points] = column;
     if (types[name] === 'x') {
       xPoints = points;
+      xLabels = points.map(point => (
+        new Date(point)
+          .toDateString()
+          .split(' ')
+          .splice(1, 2)
+          .join(' ')
+      ));
       return;
     }
     lines = lines.length > 0 ? lines.concat([column]) : [].concat([column]);
@@ -195,18 +341,23 @@ const newChart = chartData => {
       formattedRange: formatX(range),
     };
   };
-
   const getViewedY = (startIndex, endIndex) => {
     const viewedYPoints = lines
       .map(([, ...points]) => points.splice(startIndex, endIndex - startIndex))
       .flat();
-    const startY = Math.min(...viewedYPoints);
     const endY = Math.max(...viewedYPoints);
+    const k = endY.toString().length - 2;
+    const step = roundUp(endY / 6, -k);
+    const steps = [];
+    for (let i = 0; i < 6; i++) {
+      steps[i] = step * i;
+    }
 
     return {
-      start: Math.min(...viewedYPoints),
-      end: Math.max(...viewedYPoints),
-      range: endY - startY,
+      start: 0,
+      end: endY,
+      steps,
+      step,
     };
   };
 
@@ -219,15 +370,32 @@ const newChart = chartData => {
     transform: `translate(0, 0) scale(1, 1)`,
   };
 
+  const rangeSelector = new RangeSelector({
+    height: `${chartHeight}px`,
+    width: '100%',
+    position: 'absolute',
+    top: `${chartTop}px`,
+  });
+  const carousel = new LineCarousel(viewedY.steps, {
+    height: `${previewWrapperHeight}px`,
+    width: '100%',
+    position: 'absolute',
+    top: `${0}px`,
+  });
+  const labels = new Labels(xLabels, {
+    width: '100%',
+    position: 'absolute',
+    top: `${previewWrapperHeight}px`,
+  });
+
   const createPolylines = () => {
     lines.forEach(([name, ...yPoints]) => {
       const polyline = document.createElementNS(xmlns, 'polyline');
-      const points = yPoints.map((yPoint, index) => [formatX(xPoints[index]), yPoint]).join(' ');
+      const points = yPoints.map((yPoint, index) => [formatX(xPoints[index]), -yPoint]).join(' ');
 
       setAttributesNS(polyline, {
         points,
         stroke: colors[name],
-        strokeWidth: 1,
         'vector-effect': 'non-scaling-stroke',
         fill: 'none',
       });
@@ -235,44 +403,28 @@ const newChart = chartData => {
     });
   };
 
-  const initPreview = () => {
-    preview.id = 'preview';
-
-    previewUseChart.setAttributeNS(xlinkns, 'xlink:href', '#chart');
-    setAttributesNS(previewUseChart, {
-      x: 0,
-      y: 0,
-      width: x.formattedRange,
-      height: previewWrapperHeight,
-      style: 'transition: transform .3s;',
-    });
-    usePreview.setAttributeNS(xlinkns, 'xlink:href', '#preview');
-    setAttributesNS(usePreview, {
-      x: 0,
-      y: 0,
-      height: previewWrapperHeight,
-    });
-
-    preview.appendChild(previewUseChart);
-    appendChilds(svg, [
-      preview,
-      usePreview,
-    ]);
-  };
-
   const updatePreview = (leftPercent, valuePercent) => {
-    const viewedStartX = unformatX(x.formattedStart + (x.formattedRange * leftPercent));
+    const viewedStartX = x.start + (x.range * leftPercent);
     const viewedStartXIndex = minMax(0, xPoints.length - 1, xPoints.findIndex(point => point >= viewedStartX) - 1);
-    const viewedEndX = unformatX(x.formattedEnd - (x.formattedRange * (1 - leftPercent - valuePercent)));
+    const viewedEndX = x.start + (x.range * (leftPercent + valuePercent));
     const viewedEndXIndex = minMax(0, xPoints.length - 1, xPoints.findIndex(point => point >= viewedEndX) + 1);
-    viewedY = { ...getViewedY(viewedStartXIndex, viewedEndXIndex) };
+    const tempViewedY = { ...getViewedY(viewedStartXIndex, viewedEndXIndex) };
 
-    const topPercent = (viewedY.start - y.start) / y.range;
-    const heightPercent = viewedY.range / y.range;
+    if (viewedY.end < tempViewedY.end) {
+      carousel.up(tempViewedY.steps);
+      viewedY = tempViewedY;
+    } else if (viewedY.end > tempViewedY.end) {
+      carousel.down(tempViewedY.steps);
+      viewedY = tempViewedY;
+    }
+    labels.setPosition(leftPercent, valuePercent);
+
+    const topPercent = ((viewedY.steps[5] + viewedY.step) - y.end) / y.end;
+    const heightPercent = (viewedY.steps[5] + viewedY.step) / y.end;
     const previewWidth = x.formattedRange / valuePercent;
     const previewX = -(leftPercent * previewWidth);
     const previewHeight = previewWrapperHeight / heightPercent;
-    const previewTop = -(topPercent * previewHeight);
+    const previewTop = (topPercent * previewHeight);
     const transform = `translate(0, ${previewTop}) scale(1, ${1 / heightPercent})`;
 
     setAttributesNS(previewUseChart, {
@@ -293,10 +445,35 @@ const newChart = chartData => {
     };
   };
 
+  const initPreview = () => {
+    preview.id = 'preview';
+    previewUseChart.setAttributeNS(xlinkns, 'xlink:href', '#chart');
+    setAttributesNS(previewUseChart, {
+      x: 0,
+      y: 0,
+      width: x.formattedRange,
+      height: previewWrapperHeight,
+      style: 'transition: transform .3s;',
+    });
+    usePreview.setAttributeNS(xlinkns, 'xlink:href', '#preview');
+    setAttributesNS(usePreview, {
+      x: 0,
+      y: 0,
+      height: previewWrapperHeight,
+      'stroke-width': previewStrokeWidth,
+    });
+
+    preview.appendChild(previewUseChart);
+    appendChilds(svg, [
+      preview,
+      usePreview,
+    ]);
+  };
+
   const initChart = () => {
     chart.id = 'chart';
     setAttributesNS(chart, {
-      viewBox: `${x.formattedStart} ${y.start} ${x.formattedRange} ${y.range}`,
+      viewBox: `${x.formattedStart} ${-y.end} ${x.formattedRange} ${y.end}`,
       preserveAspectRatio: 'none',
       width: '100%',
       height: chartHeight,
@@ -306,6 +483,7 @@ const newChart = chartData => {
       x: 0,
       y: chartTop,
       height: chartHeight,
+      'stroke-width': chartStrokeWidth,
     });
 
     svg.appendChild(chart);
@@ -313,36 +491,32 @@ const newChart = chartData => {
     createPolylines();
   };
 
-  const rangeSelector = new RangeSelector({
-    height: `${chartHeight}px`,
-    width: '100%',
-    position: 'absolute',
-    top: `${chartTop}px`,
-  });
-
-  rangeSelector.onChange(({ leftPercent, valuePercent }) => updatePreview(leftPercent, valuePercent));
-
   const initSvg = () => {
     setAttributes(svgWrapper, {
       class: 'chart',
       style: 'position:relative;',
     });
     setAttributesNS(svg, {
-      viewBox: `0 0 ${x.formattedRange} ${previewWrapperHeight + chartHeight}`,
+      viewBox: `0 0 ${x.formattedRange} ${svgHeight}`,
       preserveAspectRatio: 'none',
       width: '100%',
-      height: previewWrapperHeight + chartHeight,
+      height: svgHeight,
     });
     initPreview();
     initChart();
     appendChilds(svgWrapper, [
       svg,
+      carousel.node,
+      labels.node,
       rangeSelector.node,
     ]);
   };
 
   initSvg();
-
-  return svgWrapper;
+  appendNode.appendChild(svgWrapper);
+  labels.updateWidth();
+  rangeSelector.onChange(({ leftPercent, valuePercent }) => updatePreview(leftPercent, valuePercent));
+  updatePreview(0, 1);
+  return this;
 };
 
