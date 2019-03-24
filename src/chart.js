@@ -662,8 +662,8 @@ const Chart = function Chart(appendNode, {
   };
 
   const updateRangeSelector = () => {
-    const heightPercent = initedY.end / viewedY.end;
-    const transform = `scale(1, ${heightPercent})`;
+    const heightPercent = viewedY.end / initedY.end;
+    const transform = `scale(1, ${1 / heightPercent})`;
     setAttributesNS(range.use, {
       x: 0,
       y: 0,
