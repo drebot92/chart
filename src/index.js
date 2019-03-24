@@ -1,19 +1,21 @@
 const app = document.getElementById('app');
 const chart = new Chart(app, {
   data: chartsData[0],
-  previewHeight: 600,
+  previewHeight: 300,
 });
 const chart2 = new Chart(app, {
   data: chartsData[1],
-  previewHeight: 600,
+  previewHeight: 300,
 });
-// const chart2 = new Chart({
-//   data: chartsData[1],
-// });
-
-console.log(chart, chart2);
-
-
-// app.appendChild(chart);
-// app.appendChild(chart2);
-console.timeEnd();
+const chart3 = new Chart(app, {
+  data: chartsData[2],
+  previewHeight: 300,
+});
+const chart4 = new Chart(app, {
+  data: chartsData[3],
+  previewHeight: 300,
+});
+const chart5 = new Chart(app, {
+  data: chartsData[4],
+  previewHeight: 300,
+});

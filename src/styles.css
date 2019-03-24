@@ -2,15 +2,61 @@ body {
   font-family: sans-serif;
 }
 
-.chart {
+.chart,
+.chart * {
   box-sizing: border-box;
 }
-.chart > svg {
+.chart + .chart {
+  margin-top: 40px;
+}
+
+.chart svg {
+  display: block;
   pointer-events: none;
 }
 .chart * {
   box-sizing: border-box;
 }
+
+.chart__preview {
+  margin-bottom: 5px;
+  position: relative;
+  transition: .1s ease-in-out;
+  overflow: hidden;
+}
+
+
+.chart__selector {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  position: relative;
+  transition: .1s ease-in-out;
+}
+.chart__preview--empty > *,
+.chart__selector--empty > * {
+  opacity: .5;
+  pointer-events: none;
+}
+.chart__preview--empty:before,
+.chart__selector--empty:before {
+  content: 'All Lines Hidden';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.chart__selector > .range-controls {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
 
 .range-controls {
   user-select: none;
@@ -76,6 +122,7 @@ body {
   cursor: -webkit-grabbing;
 }
 
+
 .y-lines {
   position: relative;
 }
@@ -87,15 +134,17 @@ body {
   width: 100%;
   position: absolute;
   bottom: 0;
+  z-index: -1;
   opacity: 0;
   transition: .3s ease-in-out;
   pointer-events: none;
   transform-origin: left bottom;
 }
 .y-lines__group > div {
-  border-bottom: solid 1px rgba(150, 150, 150, .15);
+  border-bottom: solid 1px #F2F4F5;
   font-size: 12px;
-  color: rgba(100, 100, 100, 1);
+  font-weight: 300;
+  color: #96A2AA;
 }
 .y-lines__group.up {
   height: 200%;
@@ -108,6 +157,7 @@ body {
   height: calc(100%/6*3);
 }
 
+
 .x-labels {
   overflow-x: hidden;
 }
@@ -115,9 +165,133 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   width: 100%;
+  position: relative;
+  font-size: 12px;
+  font-weight: 300;
+  color: #96A2AA;
+  white-space: nowrap;
+}
+.x-labels__scroll-group > div {
+  transition: .3s ease-in-out;
+}
+.x-labels__scroll-group > div:first-child {
+  transform: translateX(50%);
+}
+.x-labels__scroll-group > div:last-child {
+  transform: translateX(-50%);
+  text-align: right;
+}
+
+
+.tooltips {
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow-x: hidden;
+}
+.tooltips__scroll-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  width: 100%;
+  height: 100%;
+  position: relative;
   font-size: 10px;
   white-space: nowrap;
 }
-.x-labels__scroll-group > div{
-  transition: .3s ease-in-out;
+.tooltips:not(.tooltips--active) .tooltips__hilight {
+  display: none;
+}
+.tooltips__hilight {
+  height: 100%;
+  width: 1px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: #DFE6EB;
+  pointer-events: none;
+}
+.tooltips__hilight > div {
+  position: absolute;
+}
+.tooltips__point {
+  display: block;
+  margin: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #fff;
+  border: solid 2px gray;
+}
+
+.tooltips__tooltip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 15px;
+  border-radius: 3px;
+  background-color: #fff;
+  box-shadow: 0 1px 2px #D8D8D8;
+  transform: translateX(-50%);
+}
+.tooltips__tooltip > span:first-child {
+  grid-column-start: span 2;
+  margin-bottom: 5px;
+  padding: 0 5px;
+  font-size: 14px;
+  color: #222222;
+}
+.tooltips__value {
+  padding: 0 5px;
+  font-size: 12px;
+}
+.tooltips__value > span {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.legend {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  grid-gap: 15px;
+}
+.legend__label {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 20px;
+  border: solid 1px #E6ECF0;
+  cursor: pointer;
+}
+.legend__label > input {
+  display: none;
+}
+.legend__label > span {
+  display: flex;
+  align-items: center;
+}
+.legend__label .check {
+  display: block;
+  margin-right: 10px;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  border-radius: 50%;
+}
+.legend__label .check:before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #fff;
+  transition: .1s;
+}
+.legend__label > input:checked + span .check:before {
+  background-color: transparent;
 }
