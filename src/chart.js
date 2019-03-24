@@ -1,5 +1,7 @@
 console.time();
 
+const generateId = () => Math.round(Math.random() * 1000000);
+
 const roundUp = (value, precision) => {
   const multiplier = Math.pow(10, precision || 0);
   return Math.ceil(value * multiplier) / multiplier;
@@ -21,9 +23,12 @@ const LineCarousel = function LineCarousel(value, style) {
     document.createElement('div'),
     document.createElement('div'),
   ]);
-  forEachKey(style, (key, val) => {
-    node.style[key] = val;
-  });
+
+  if (style) {
+    forEachKey(style, (key, val) => {
+      node.style[key] = val;
+    });
+  }
 
   const childs = node.childNodes;
   const currentClass = 'current y-lines__group';
@@ -83,14 +88,17 @@ const Labels = function Labels(labels, style) {
   const node = document.createElement('div');
   const scrollGroup = document.createElement('div');
   const styleNode = document.createElement('style');
+  const groupId = `scroll-group-${generateId()}`;
 
   node.appendChild(scrollGroup);
-  scrollGroup.setAttribute('class', 'x-labels__scroll-group');
+  scrollGroup.setAttribute('class', `x-labels__scroll-group ${groupId}`);
   node.setAttribute('class', 'x-labels');
 
-  forEachKey(style, (key, val) => {
-    node.style[key] = val;
-  });
+  if (style) {
+    forEachKey(style, (key, val) => {
+      node.style[key] = val;
+    });
+  }
 
   labels.forEach(label => {
     const labelNode = document.createElement('div');
@@ -108,7 +116,7 @@ const Labels = function Labels(labels, style) {
       .x-labels__scroll-group > div {
         opacity: 0;
       }
-      .x-labels__scroll-group > div:nth-child(${hiddenLabelsCount}n+1) {
+      .x-labels__scroll-group.${groupId} > div:nth-child(${hiddenLabelsCount}n+1) {
         opacity: 1;
       }
     `;
@@ -125,9 +133,9 @@ const Labels = function Labels(labels, style) {
       updateStyle(hiddenLabelsCount);
     }
   };
-  this.setPosition = (leftPercent, valuePercent) => {
+  this.setPosition = (leftPercent, widthPercent) => {
     this.updateWidth();
-    const width = 1 / valuePercent * 100;
+    const width = 1 / widthPercent * 100;
     const left = leftPercent * 100;
     setAttributes(scrollGroup, {
       style: `
@@ -146,7 +154,7 @@ const RangeSelector = function RangeSelector(style) {
     leftPercent: 0,
     right: 0,
     value: 0,
-    valuePercent: 1,
+    widthPercent: 1,
   };
   const cursor = {
     offsetX: 0,
@@ -172,9 +180,11 @@ const RangeSelector = function RangeSelector(style) {
   node.style.display = 'grid';
   node.style.gridTemplateColumns = `${0}px 1fr ${0}px`;
 
-  forEachKey(style, (key, value) => {
-    node.style[key] = value;
-  });
+  if (style) {
+    forEachKey(style, (key, value) => {
+      node.style[key] = value;
+    });
+  }
 
   rangeArea.setAttribute('class', 'range-controls__area');
   areaHandle.setAttribute('class', 'range-controls__area-handle');
@@ -218,7 +228,7 @@ const RangeSelector = function RangeSelector(style) {
     }
 
     range.value = range.width - range.right - range.left;
-    range.valuePercent = range.value / range.width;
+    range.widthPercent = range.value / range.width;
 
     if (handle === 'area') {
       range.left = minMax(0, range.width - range.value, leftOld + cursor.offsetX);
@@ -279,6 +289,43 @@ const RangeSelector = function RangeSelector(style) {
   };
 };
 
+const LegendCheckboxes = function LegendCheckboxes(names, style) {
+  const node = document.createElement('div');
+  let change = () => {};
+
+  node.setAttribute('class', 'legend');
+
+  forEachKey(names, (key, val) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    const span = document.createElement('span');
+    label.setAttribute('class', 'legend__label');
+    span.innerText = val;
+    setAttributes(input, {
+      type: 'checkbox',
+      value: key,
+      title: val,
+      checked: 'true',
+    });
+    input.addEventListener('change', event => {
+      change(event.target.value, event.target.checked);
+    });
+    label.appendChild(input);
+    label.appendChild(span);
+    node.appendChild(label);
+  });
+
+  if (style) {
+    forEachKey(style, (key, val) => {
+      node.style[key] = val;
+    });
+  }
+  this.onChange = cb => {
+    change = cb;
+  };
+  this.node = node;
+};
+
 const Chart = function Chart(appendNode, {
   data,
   gap = 50,
@@ -307,9 +354,13 @@ const Chart = function Chart(appendNode, {
   const types = data.types;
   const names = data.names;
   const colors = data.colors;
+  const polylines = [];
+  let hiddenLines = [];
   let lines = [];
   let xPoints = [];
   let xLabels = [];
+  let previewLeftPercent = 0;
+  let previewWidthPercent = 1;
 
   data.columns.forEach(column => {
     const [name, ...points] = column;
@@ -342,9 +393,12 @@ const Chart = function Chart(appendNode, {
     };
   };
   const getViewedY = (startIndex, endIndex) => {
-    const viewedYPoints = lines
-      .map(([, ...points]) => points.splice(startIndex, endIndex - startIndex))
-      .flat();
+    const viewedYPoints = lines.flatMap(([name, ...points]) => (
+      hiddenLines.includes(name)
+        ? []
+        : points.splice(startIndex, endIndex - startIndex)
+    ));
+    console.log(hiddenLines, viewedYPoints);
     const endY = Math.max(...viewedYPoints);
     const k = endY.toString().length - 2;
     const step = roundUp(endY / 6, -k);
@@ -362,7 +416,7 @@ const Chart = function Chart(appendNode, {
   };
 
   const x = { ...getViewedX(0, xPoints.length - 1) };
-  const y = { ...getViewedY(0, xPoints.length - 1) };
+  let y = { ...getViewedY(0, xPoints.length - 1) };
   let viewedY = y;
   let previewProps = {
     x: 0,
@@ -387,26 +441,68 @@ const Chart = function Chart(appendNode, {
     position: 'absolute',
     top: `${previewWrapperHeight}px`,
   });
+  const legend = new LegendCheckboxes(names);
 
   const createPolylines = () => {
-    lines.forEach(([name, ...yPoints]) => {
+    lines.forEach(([name, ...yPoints], index) => {
       const polyline = document.createElementNS(xmlns, 'polyline');
-      const points = yPoints.map((yPoint, index) => [formatX(xPoints[index]), -yPoint]).join(' ');
+      const points = yPoints.map((yPoint, i) => [formatX(xPoints[i]), -yPoint]).join(' ');
 
       setAttributesNS(polyline, {
         points,
         stroke: colors[name],
         'vector-effect': 'non-scaling-stroke',
         fill: 'none',
+        // style: 'transition: .3s;',
       });
       chart.appendChild(polyline);
+      polylines[index] = polyline;
     });
   };
 
-  const updatePreview = (leftPercent, valuePercent) => {
+  const updatePolylines = () => {
+    lines.forEach(([name, ...yPoints], index) => {
+      setAttributesNS(polylines[index], {
+        style: hiddenLines.includes(name)
+          ? 'opacity: 0;'
+          : 'opacity: 1;',
+      });
+    });
+  };
+
+  const initPreview = () => {
+    const id = `preview-${generateId()}`;
+    preview.id = id;
+    usePreview.setAttributeNS(xlinkns, 'xlink:href', `#${id}`);
+    setAttributesNS(previewUseChart, {
+      x: 0,
+      y: 0,
+      width: x.formattedRange,
+      height: previewWrapperHeight,
+      style: 'transition: transform .3s;',
+    });
+    setAttributesNS(usePreview, {
+      x: 0,
+      y: 0,
+      height: previewWrapperHeight,
+      'stroke-width': previewStrokeWidth,
+    });
+
+    preview.appendChild(previewUseChart);
+    appendChilds(svg, [
+      preview,
+      usePreview,
+    ]);
+  };
+
+  const updatePreview = (leftPercent = previewLeftPercent, widthPercent = previewWidthPercent) => {
+    console.log(leftPercent, widthPercent);
+    previewLeftPercent = leftPercent;
+    previewWidthPercent = widthPercent;
+
     const viewedStartX = x.start + (x.range * leftPercent);
     const viewedStartXIndex = minMax(0, xPoints.length - 1, xPoints.findIndex(point => point >= viewedStartX) - 1);
-    const viewedEndX = x.start + (x.range * (leftPercent + valuePercent));
+    const viewedEndX = x.start + (x.range * (leftPercent + widthPercent));
     const viewedEndXIndex = minMax(0, xPoints.length - 1, xPoints.findIndex(point => point >= viewedEndX) + 1);
     const tempViewedY = { ...getViewedY(viewedStartXIndex, viewedEndXIndex) };
 
@@ -417,11 +513,11 @@ const Chart = function Chart(appendNode, {
       carousel.down(tempViewedY.steps);
       viewedY = tempViewedY;
     }
-    labels.setPosition(leftPercent, valuePercent);
+    labels.setPosition(leftPercent, widthPercent);
 
     const topPercent = ((viewedY.steps[5] + viewedY.step) - y.end) / y.end;
     const heightPercent = (viewedY.steps[5] + viewedY.step) / y.end;
-    const previewWidth = x.formattedRange / valuePercent;
+    const previewWidth = x.formattedRange / widthPercent;
     const previewX = -(leftPercent * previewWidth);
     const previewHeight = previewWrapperHeight / heightPercent;
     const previewTop = (topPercent * previewHeight);
@@ -445,40 +541,17 @@ const Chart = function Chart(appendNode, {
     };
   };
 
-  const initPreview = () => {
-    preview.id = 'preview';
-    previewUseChart.setAttributeNS(xlinkns, 'xlink:href', '#chart');
-    setAttributesNS(previewUseChart, {
-      x: 0,
-      y: 0,
-      width: x.formattedRange,
-      height: previewWrapperHeight,
-      style: 'transition: transform .3s;',
-    });
-    usePreview.setAttributeNS(xlinkns, 'xlink:href', '#preview');
-    setAttributesNS(usePreview, {
-      x: 0,
-      y: 0,
-      height: previewWrapperHeight,
-      'stroke-width': previewStrokeWidth,
-    });
-
-    preview.appendChild(previewUseChart);
-    appendChilds(svg, [
-      preview,
-      usePreview,
-    ]);
-  };
-
   const initChart = () => {
-    chart.id = 'chart';
+    const id = `chart-${generateId()}`;
+    chart.id = id;
+    previewUseChart.setAttributeNS(xlinkns, 'xlink:href', `#${id}`);
+    useChart.setAttributeNS(xlinkns, 'xlink:href', `#${id}`);
     setAttributesNS(chart, {
       viewBox: `${x.formattedStart} ${-y.end} ${x.formattedRange} ${y.end}`,
       preserveAspectRatio: 'none',
       width: '100%',
       height: chartHeight,
     });
-    useChart.setAttributeNS(xlinkns, 'xlink:href', '#chart');
     setAttributesNS(useChart, {
       x: 0,
       y: chartTop,
@@ -489,6 +562,15 @@ const Chart = function Chart(appendNode, {
     svg.appendChild(chart);
     svg.appendChild(useChart);
     createPolylines();
+  };
+
+  const updateChart = () => {
+    console.log('updateChart', chart);
+    y = { ...getViewedY(0, xPoints.length - 1) };
+    chart.setAttributeNS(null, 'viewBox', `${x.formattedStart} ${-y.end} ${x.formattedRange} ${y.end}`);
+    // setAttributesNS(chart, {
+    //   viewBox: `${x.formattedStart} ${-y.end} ${x.formattedRange} ${y.end}`,
+    // });
   };
 
   const initSvg = () => {
@@ -509,14 +591,26 @@ const Chart = function Chart(appendNode, {
       carousel.node,
       labels.node,
       rangeSelector.node,
+      legend.node,
     ]);
   };
 
   initSvg();
   appendNode.appendChild(svgWrapper);
   labels.updateWidth();
-  rangeSelector.onChange(({ leftPercent, valuePercent }) => updatePreview(leftPercent, valuePercent));
-  updatePreview(0, 1);
+  rangeSelector.onChange(({ leftPercent, widthPercent }) => updatePreview(leftPercent, widthPercent));
+  legend.onChange((name, checked) => {
+    console.log(name, checked);
+    if (checked) {
+      hiddenLines = hiddenLines.filter(hiddenLine => hiddenLine !== name);
+    } else {
+      hiddenLines = hiddenLines.concat(name);
+    }
+    updateChart();
+    updatePreview();
+    updatePolylines();
+  });
+  updatePreview();
   return this;
 };
 
