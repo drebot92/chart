@@ -180,7 +180,7 @@ const Tooltips = function Tooltips(xPoints, lines, colors, style) {
   const updatePoints = index => {
     tooltipDate.innerText = xPoints[index];
     lines.forEach((line, i) => {
-      tooltipValues[i].innerHTML = `<span>${line[index + 1].toLocaleString('us')}</span>${line[0]}`;
+      tooltipValues[i].innerHTML = `<span>${line[index + 1].toLocaleString()}</span>${line[0]}`;
       const bottom = line[index + 1] / chartYRange * 100;
       setStyle(points[i], {
         'border-color': colors[line[0]],
@@ -616,10 +616,10 @@ const Chart = function Chart(appendNode, {
     const tempViewedY = { ...getViewedY(startXIndex, endXIndex) };
 
     if (viewedY.end < tempViewedY.end) {
-      yLines.up(tempViewedY.steps);
+      yLines.up(tempViewedY.formattedSteps);
       viewedY = tempViewedY;
     } else if (viewedY.end > tempViewedY.end) {
-      yLines.down(tempViewedY.steps);
+      yLines.down(tempViewedY.formattedSteps);
       viewedY = tempViewedY;
     }
     const heightPercent = initedY.end / (viewedY.steps[5] + viewedY.step);
@@ -724,7 +724,7 @@ const Chart = function Chart(appendNode, {
     } else {
       preview.node.classList.remove('chart__preview--empty');
       range.node.classList.remove('chart__selector--empty');
-      yLines.up(viewedY.steps);
+      yLines.up(viewedY.formattedSteps);
     }
   });
 
