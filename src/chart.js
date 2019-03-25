@@ -2,7 +2,7 @@ const generateId = () => Math.round(Math.random() * 1000000);
 
 const roundUp = (value, precision) => {
   const multiplier = Math.pow(10, precision || 0);
-  return Math.ceil(value * multiplier) / multiplier;
+  return Math.ceil(Math.ceil(value * multiplier) / multiplier);
 };
 
 const minMax = (min, max, value) => Math.min(max, Math.max(min, value));
@@ -180,7 +180,7 @@ const Tooltips = function Tooltips(xPoints, lines, colors, style) {
   const updatePoints = index => {
     tooltipDate.innerText = xPoints[index];
     lines.forEach((line, i) => {
-      tooltipValues[i].innerHTML = `<span>${line[index + 1]}</span>${line[0]}`;
+      tooltipValues[i].innerHTML = `<span>${line[index + 1].toLocaleString('us')}</span>${line[0]}`;
       const bottom = line[index + 1] / chartYRange * 100;
       setStyle(points[i], {
         'border-color': colors[line[0]],
@@ -490,14 +490,23 @@ const Chart = function Chart(appendNode, {
     const k = endY.toString().length - 2;
     const step = roundUp(endY / 6, -k);
     const steps = [];
+    const formattedSteps = [];
     for (let i = 0; i < 6; i++) {
       steps[i] = step * i;
+      const formattedStep = (
+        (k + 1 >= 9 && `${(step * i) / 1000000000}B`) ||
+        (k + 1 >= 6 && `${(step * i) / 1000000}M`) ||
+        (k + 1 >= 3 && `${(step * i) / 1000}K`) ||
+        `${step * i}`
+      );
+      formattedSteps[i] = formattedStep;
     }
 
     return {
       start: 0,
       end: endY,
       steps,
+      formattedSteps,
       step,
     };
   };
@@ -511,7 +520,7 @@ const Chart = function Chart(appendNode, {
     transform: `scale(1, 1)`,
   };
 
-  const yLines = new LineCarousel(viewedY.steps, {
+  const yLines = new LineCarousel(viewedY.formattedSteps, {
     height: `${preview.height}px`,
     width: '100%',
     position: 'absolute',
@@ -721,4 +730,3 @@ const Chart = function Chart(appendNode, {
 
   return this;
 };
-
